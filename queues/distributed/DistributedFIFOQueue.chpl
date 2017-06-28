@@ -77,7 +77,12 @@ use ReplicatedDist;
   nature of the per-locale queues are nothing special, and if anything increase overall concurrency.
 */
 
+config const NODES_PER_LOCALE = 512;
+
 class WaitListNode {
+  // Are we in use?
+  var inUse : atomic bool;
+
   // Our served queue index
   var idx : int = -1;
 
@@ -87,18 +92,8 @@ class WaitListNode {
   var wait : atomic bool;
   var completed : bool;
 
-  // Next in the waitlist
-  var next : WaitListNode;
-}
-
-record WaitList {
-  var headWaitList : LocalAtomicObject(WaitListNode);
-  var tailWaitList : LocalAtomicObject(WaitListNode);
-
-  proc WaitList() {
-    headWaitList.write(new WaitListNode());
-    tailWaitList.write(new WaitListNode());
-  }
+  // Descriptor to next node in list. If it is 0, it is equivalent to nil
+  var nextIdx : uint;
 }
 
 class DistributedFIFOQueue : Queue {
@@ -112,15 +107,54 @@ class DistributedFIFOQueue : Queue {
   var perLocaleSpace = { 0 .. 0 };
   var perLocaleDomain = perLocaleSpace dmapped Replicated();
   var localQueues : [perLocaleDomain] Queue(eltType);
-  var localWaitList : [perLocaleDomain] WaitList;
+
+  // Head wait-list needed to ensure forward progression and eliminate contention...
+  var descriptorTable : [Locales.domain][{1 .. NODES_PER_LOCALE}] WaitListNode;
+  var descriptorAllocIndexDom = {0 .. 0} dmapped Replicated();
+  var descriptorAllocIndex : [descriptorAllocIndexDom] atomic uint;
+  var headDescriptor : atomic uint;
 
   // TODO: Custom Locales
   proc DistributedFIFOQueue(type eltType) {
+    var numDescriptors : atomic int;
     forall loc in Locales {
       on loc {
         localQueues[0] = new SyncQueue(eltType);
+        numDescriptors.add(here.maxTaskPar);
       }
     }
+
+    // Allocate descriptors...
+    forall localeIdx in Locales.domain {
+      for descrIdx in 1 .. NODES_PER_LOCALE {
+          descriptorTable[localeIdx][descrIdx] = new WaitListNode();
+      }
+    }
+
+    // Initially set for our locale...
+    headDescriptor.write(getNextDescriptorIndex());
+  }
+
+  // Upper bits have locale index encoded... Lower bits have index of node for that locale...
+  inline proc getNextDescriptorIndex() : uint {
+    var lower = descriptorAllocIndex[0].fetchAdd(1) % NODES_PER_LOCALE : uint + 1;
+    var upper = here.id;
+    return upper << 32 | lower;
+  }
+
+  // Upper 32 bits
+  inline proc getLocaleIndex(descrIdx) : uint {
+    return descrIdx >> 32;
+  }
+
+  // Lowest 32 bits
+  inline proc getNodeIndex(descrIdx) : uint {
+    return descrIdx & 0xFFFFFFFF;
+  }
+
+  // Obtain node from descriptor...
+  inline proc getDescriptorNode(descrIdx) : WaitListNode {
+    return descriptorTable[getLocaleIndex(descrIdx) : int][getNodeIndex(descrIdx) : int];
   }
 
   proc getNextHeadIndex() : int {
@@ -130,14 +164,27 @@ class DistributedFIFOQueue : Queue {
     // most use-cases and scenarios.
     var requestsServed = 0;
 
-    // Create our dummy node
-    var nextNode = new WaitListNode();
+    // Our dummy node, of which we need to recycle. We need to spin until its available.
+    var nextNodeIdx = getNextDescriptorIndex();
+    var nextNode = getDescriptorNode(nextNodeIdx);
+    // Test-And-Test-And-Set...
+    while true {
+      nextNode.inUse.waitFor(false);
+      if nextNode.inUse.compareExchangeStrong(false, true) {
+        break;
+      }
+    }
+
+    // Setup our dummy node...
+    // TODO: Find a way to have this be one communication?
     nextNode.wait.write(true);
     nextNode.completed = false;
+    nextNode.nextIdx = 0;
 
     // Register our dummy node...
-    var currNode = localWaitList[0].headWaitList.exchange(nextNode);
-    currNode.next = nextNode;
+    var currNodeIdx = headDescriptor.exchange(nextNodeIdx);
+    var currNode = getDescriptorNode(currNodeIdx);
+    currNode.nextIdx = nextNodeIdx;
 
     // Spin until we are alerted...
     currNode.wait.waitFor(false);
@@ -146,10 +193,11 @@ class DistributedFIFOQueue : Queue {
     // longer being touched by the combiner thread. We have officially been served...
     if currNode.completed {
       var retval = currNode.idx;
-      delete currNode;
+      currNode.inUse.write(false);
       return retval;
     }
 
+    // TODO: Perhaps try jumping to Locale #0?
     // If we are not marked as complete, we *are* the combiner thread, so begin
     // serving everyone's request. As the combiner, it is our sole obligation to
     // contest for our global lock.
@@ -157,28 +205,17 @@ class DistributedFIFOQueue : Queue {
     var tmpNodeNext : WaitListNode;
     const maxRequests = here.maxTaskPar;
 
-    while (tmpNode.next != nil && requestsServed < maxRequests) {
+    while (tmpNode.nextIdx != 0 && requestsServed < maxRequests) {
       requestsServed = requestsServed + 1;
-      // Note: Ensures that we do not touch the current node after it is freed
-      // by the owning thread...
-      tmpNodeNext = tmpNode.next;
+      // Ensures we do not touch after the node is recycled by owning task...
+      tmpNodeNext = getDescriptorNode(tmpNode.nextIdx);
 
-      // Contend for head...
-      var successful : bool;
-      while true {
-        var _tail = globalTail.read();
-        var _head = globalHead.read();
-
-        // Full, we're done here...
-        if _head == _tail {
-          break;
-        }
-
-        // Contest...
-        if globalHead.compareExchangeStrong(_head, _head + 1) {
-            tmpNode.idx = (_head % numLocales : uint) : int;
-            break;
-        }
+      // Update head...
+      var _tail = globalTail.read();
+      var _head = globalHead.read();
+      if _head != _tail {
+        globalHead.write(_head + 1);
+        tmpNode.idx = (_head % numLocales : uint) : int;
       }
 
       // We are done with this one... Note that this uses an acquire barrier so
@@ -191,9 +228,11 @@ class DistributedFIFOQueue : Queue {
 
     // At this point, it means one thing: Either we are on the dummy node, on which
     // case nothing happens, or we exceeded the number of requests we can do at once,
-    // meaning we wake up the next thread as the combiner.
+    // meaning we wake up the next thread as the combiner. Also recycle our node...
     tmpNode.wait.write(false);
-    return currNode.idx;
+    var ourIdx = currNode.idx;
+    currNode.inUse.write(false);
+    return ourIdx;
   }
 
   proc enqueue(elt : eltType) {
