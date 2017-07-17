@@ -2,14 +2,14 @@ class Queue {
   type eltType;
 
   // Adds single element...
-  proc enqueue(elt : eltType);
+  proc enqueue(elt : eltType) {halt();}
 
   // Adds multiple elements...
-  proc enqueue(elt : eltType ... ?nElts);
+  proc enqueue(elt : eltType ... ?nElts) {halt();}
 
   // Adds in another queue's elements to our own in FIFO order. This operation is *not*
   // lineraizable.
-  proc enqueue(queue : Queue(eltType));
+  proc enqueue(queue : Queue(eltType)) {halt();}
 
   // Add all elements yielded by some function. If a way to actually capture an iterator
   // exists, perfect! Otherwise, we'd need to improvise with some kind of lambda that
@@ -21,13 +21,13 @@ class Queue {
   // in this fashion it could be it's own function?) Example of a good use-case: "How does my application
   // scale when presented with near infinite (but bounded) amounts of data"? You can easily populate
   // the queue repeatedly with dummy data/work. Just an idea...
-  proc enqueue(iterObj)
+  proc enqueue(iterObj) {halt();}
 
   // Normal dequeue
-  proc dequeue() : (bool, eltType);
+  proc dequeue() : (bool, eltType) {halt();}
 
   // Dequeue *multiple* elements.
-  proc dequeue(nElems) : (int, [] eltType);
+  proc dequeue(nElems) : (int, [?n] eltType) {halt();}
 }
 
 class QueueFactory {
@@ -59,13 +59,13 @@ class QueueFactory {
     type eltType,
     maxElems : uint = 0,
     targetLocales : [] locale = Locales
-  ) : Queue(eltType);
+  ) : Queue(eltType) {halt();}
 
   // Local variant
   proc makeBoundedFIFO(
     type eltType,
     maxElems : uint = 0
-  ) : Queue(eltType);
+  ) : Queue(eltType) {halt();}
 
   /*
     Creates an unbounded strict First-In-First-Out Queue. In this queue, each locale is
@@ -85,12 +85,12 @@ class QueueFactory {
   proc makeDistributedUnboundedFIFO(
     type eltType,
     targetLocales : [] locale = Locales
-  ) : Queue(eltType);
+  ) : Queue(eltType) {halt();}
 
   // Local variant
   proc makeUnboundedFIFO(
-    type eltType;
-  ) : Queue(eltType);
+    type eltType
+  ) : Queue(eltType) {halt();}
 
   /*
     (WIP - Implementing)
@@ -99,10 +99,10 @@ class QueueFactory {
   proc makeDistributedWorkQueue(
     type eltType,
     targetLocales : [] locale = Locales
-  ) : Queue(eltType);
+  ) : Queue(eltType) {halt();}
 
   // Local variant
   proc makeWorkQueue(
     type eltType
-  ) : Queue(eltType);
+  ) : Queue(eltType) {halt();}
 }
