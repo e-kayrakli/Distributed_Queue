@@ -1,26 +1,47 @@
+/*
+  A data structure that allows for parallel-safe storage of elements. This Queue offers
+  two variants: A FIFO Queue, which is the typical First-In-First-Out ordering as to
+  be expected of a Queue, and the second being a 'Work' Queue, which does not impose
+  any ordering whatsoever and aims to satiate the desire for high performance. Furthermore,
+  we offer two variants for each variant: a local version that is optimized for a single locale,
+  and a distributed version that is optimized for multiple locales.
+
+  A queue may also be 'frozen', in which no modifications may take place on the queue.
+  This allows for 'read-only' iteration semantics and makeas reduction on a queue possible,
+  as well as concatenation of multiple frozen queues. A frozen queue can be unfrozen at
+  any time as well, but the user must beware that unfreezing a queue while a concurrent operation
+  is on-going is implementation-defined.
+
+  A queue may be concatenated with many different sources, from queues, to arrays, to arbitrary
+  objects that support serial iteration, which append the other source's elements with
+  itself. As well, for queues that are bounded, we have an 'all-or-nothing' transactional
+  approach to adding in bulk: either all elements are added, or none are.
+
+  Open Questions:
+  1) Frozen Queue Semantics
+  2) Bounded Queue problem and transactional enqueues, issue with iterator objects that
+    may result in 'dropping' items if we choose 'nothing'.
+*/
 class Queue {
+  /*
+    The type of the element.
+  */
   type eltType;
 
-  // Adds single element...
-  proc enqueue(elt : eltType) {halt();}
+  /*
+    Adds all elements passed to the queue. If the queue is unbounded, it will always
+  */
+  proc enqueue(elt : eltType ... ?nElts) : bool {halt();}
 
-  // Adds multiple elements...
-  proc enqueue(elt : eltType ... ?nElts) {halt();}
+  proc enqueue(elt : [?n] eltType) {halt();}
 
   // Adds in another queue's elements to our own in FIFO order. This operation is *not*
   // lineraizable.
   proc enqueue(queue : Queue(eltType)) {halt();}
 
-  // Add all elements yielded by some function. If a way to actually capture an iterator
-  // exists, perfect! Otherwise, we'd need to improvise with some kind of lambda that
-  // returns whatever is being yielded. (I hope this is possible. This would allow us to
-  // add *any* element to our queue from another other container that contained an element,
-  // *even* ones that were infinite streams... "Why would we find interest in infinite streams
-  // for a queue that can run out of space?" - It won't run out for a bounded queue and is a cool
-  // way to continuously add elements in an on-demand fashion. Perhaps if it is meant to be used
-  // in this fashion it could be it's own function?) Example of a good use-case: "How does my application
-  // scale when presented with near infinite (but bounded) amounts of data"? You can easily populate
-  // the queue repeatedly with dummy data/work. Just an idea...
+  /*
+
+  */
   proc enqueue(iterObj) {halt();}
 
   // Normal dequeue
@@ -28,6 +49,35 @@ class Queue {
 
   // Dequeue *multiple* elements.
   proc dequeue(nElems) : (int, [?n] eltType) {halt();}
+
+  /*
+    (WIP - Planning)
+
+    Freezes a queue...
+  */
+  proc freeze() {halt();}
+
+  /*
+    (WIP - Planning)
+
+    Unfreezes a queue...
+  */
+  proc unfreeze() {halt();}
+
+  proc +=(elt : eltType ... ?nElts) {halt();}
+
+  proc +=(queue : Queue(eltType)) {halt();}
+
+  proc +(elt : eltType ... ?nElts) {halt();}
+
+  proc +(queue : Queue(eltType)) {halt();}
+
+  /*
+    Iterates over all elements in the queue. If the queue is frozen, then iteration
+    is read-only in that it will iterate over all elements without consuming them;
+    a normal iteration is equivalent to a more optimized sequence of dequeue operation.
+  */
+  iter these() {halt();}
 }
 
 class QueueFactory {
