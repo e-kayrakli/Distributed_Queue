@@ -5,44 +5,6 @@
   any ordering whatsoever and aims to satiate the desire for high performance. Furthermore,
   we offer two further variants for each: a local version that is optimized for a single locale,
   and a distributed version that is optimized for multiple locales.
-
-  A queue may also be 'frozen', in which it becomes immutable. A queue that is immutable
-  offers different semantics to one that is mutable; iteration no longer consumes elements,
-  allowing for reduction, mapping, and zipping operations with the benefit of parallel-safety,
-  as well as making it a proper source for concatenation with other queues.
-  A queue may be concatenated with many different sources, from queues, to arrays, to arbitrary
-  objects that support serial iteration, which append the other source's elements with
-  itself. As well, for queues that are bounded, we have an optional (but default)
-  transactional approach to adding elements: either all elements are added, or none are
-  (with exceptions).
-
-  If the queue is unbounded, it will always succeed with concatenation,
-  but if the queue is bounded it may return false if not enough space is
-  available. If the operation is 'transactional', then if there is not enough
-  space, none of the elements are added to the queue; if the operation is not
-  transactional, it will add as many elements as possible
-
-  Open Question: Queue concatenation semantics...
-
-  .. code-block:: chapel
-
-    // FIFO queue with capacity of one item...
-    var q1 : Queue(int) = makeBoundedFIFO(1);
-    // Adds the element '1' to the queue...
-    q1 += 1;
-    // Ensures we do not consume it when we concatenate in next step
-    q1.freeze();
-    // Constructs a new queue that inherits the bounded property of the source queue.
-    // Since the elements exceeds the max boundary of the original queue, the bounds
-    // of q2 will be 5. Furthermore, the queue will be frozen after creation.
-    // Note that, in this way, if we had nice inheritence for records we could easily
-    // manage creation of multiple queues like this. What if we had C++ rvalue move-constructors
-    // as well to make stuff like this efficient?
-    var q2 = q1 + (2,3,4,5);
-    // Can also be: + reduce (q1 + 1 + (2,3,4,5))
-    // But the above requires memory management of the temporary queue created midway.
-    var result = + reduce q2;
-
 */
 class Queue {
   /*
@@ -54,40 +16,46 @@ class Queue {
     Adds all elements to the queue, if successful. Elements are added in the
     order they are passed.
 
+    If the queue is unbounded, it will always succeed with concatenation,
+    but if the queue is bounded it may return false if not enough space is
+    available.
+
+    :arg elts: Tuple of elements
+    :type elts: :type:`eltType`
     :returns: If the enqueue is successful, and how many elements are added.
-    :rtype: (bool, int)
+    :rtype: :type:`(bool, int)`
   */
-  proc enqueue(elts : eltType ... ?nElts, transactional : bool = true) : (bool, int) {halt();}
+  proc enqueue(elts : eltType ... ?nElts) : (bool, int) {halt();}
 
   /*
-    Adds all elements to the queue. Elements are added in the
-    order they in the array.
+    Adds all elements to the queue. Elements are added in the order they in the array.
+    See the first :proc:`enqueue` for more details.
 
     :returns: If the enqueue is successful, and how many elements are added.
     :rtype: (bool, int)
   */
-  proc enqueue(elts : [?n] eltType, transactional : bool = true) : (bool, int) {halt();}
+  proc enqueue(elts : [?n] eltType) : (bool, int) {halt();}
 
   /*
     Adds all elements to the queue. Elements are added in a more optimized way
-    depending on the underlying type of the queue, and maintain the weakest ordering
-    of both queues.
+    depending on the underlying type of the queue, and maintain :attr:`this` ordering.
+    See the first :proc:`enqueue` for more details.
 
     :returns: If the enqueue is successful, and how many elements are added.
     :rtype: (bool, int)
   */
-  proc enqueue(queue : Queue(eltType), transactional : bool = true) : bool {halt();}
+  proc enqueue(queue : Queue(eltType)) : bool {halt();}
 
   /*
     Adds all elements yielded by the `iterObj`. In the case where not all
     elements can be added, then it is up to the user to be able to 'replay'
     elements not consumed and dropped. Elements are added in the order they are
-    yielded.
+    yielded. See the first :proc:`enqueue` for more details.
 
     :returns: If the enqueue is successful, and how many elements are added.
     :rtype: (bool, int)
   */
-  proc enqueue(iterObj, transactional : bool = true) : bool {halt();}
+  proc enqueue(iterObj) : bool {halt();}
 
   /*
     Remove an element from thr queue.
