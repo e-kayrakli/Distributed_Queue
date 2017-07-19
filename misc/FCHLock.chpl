@@ -1,7 +1,8 @@
-use GDT;
+use GlobalAtomicObject;
 use LocalAtomicObject;
 use ReplicatedDist;
 use Time;
+
 
 /*
   The Flat-Combining Hierarichal Lock
@@ -16,9 +17,9 @@ class FCHFunctor {
     halt("Bad Functor (by Ref)...");
   }
 
-  proc this(data : dataType) where isClass(dataType) {
+  /*proc this(data : dataType) where isClass(dataType) {
     halt("Bad Functor...");
-  }
+  }*/
 }
 
 class FCHLocalNode {
@@ -31,15 +32,13 @@ class FCHLocalNode {
 
 class FCHGlobalNode {
   var isCombiner : atomic bool;
-  var nextDescr : atomic uint;
+  var fence : atomic uint;
+  var next : FCHGlobalNode;
 }
 
-config const FCHLockMaxTime = 30;
 class FCHLock {
   var data;
-
-  var nodeGDT : GDT(FCHGlobalNode) = new GDT(FCHGlobalNode);
-  var combinerList : atomic uint;
+  var combinerList : GlobalAtomicObject(FCHGlobalNode);
 
   // We maintain local wait list that a combiner must serve on it's own node.
   var perLocaleSpace = { 0 .. 0 };
@@ -52,69 +51,63 @@ class FCHLock {
     Register ourselves as a potential combiner for our node.
     Returns the node and descriptor needed to advance us.
   */
-  proc waitForCombiner() : (FCHGlobalNode, uint) {
+  proc waitForCombiner() : FCHGlobalNode {
     // Create our node and register it.
     var node = recycledCombinerNode[0];
     if node == nil {
       node = new FCHGlobalNode();
       recycledCombinerNode[0] = node;
     }
+    node.next = nil;
     node.isCombiner.write(false);
-    node.nextDescr.write(0);
-
-    var descr = nodeGDT.register(node);
-    var prevDescr = combinerList.exchange(descr);
+    var prev = combinerList.exchange(node);
 
     // Someone else is ahead of us, append ourselves and wait...
-    if prevDescr != 0 {
-      var prevNode = nodeGDT.read(prevDescr);
-      prevNode.nextDescr.write(descr);
+    if prev != nil {
+      prev.next = node;
+      prev.fence.fetchAdd(1);
       node.isCombiner.waitFor(true);
     }
 
     // We are now the combiner... We need to keep track of our node and descriptor
     // to unregister ourselves later, so return it.
-    return (node, descr);
+    return node;
   }
 
   /*
     Relinquish duty as sole combiner for our node and allow other nodes to have a go.
   */
-  proc giveUpCombiner(node, descr) {
+  proc giveUpCombiner(node) {
     // If we are the only one, then we attempt to set the tail to nil to make it
     // easier for combiners to register later.
-    if node.nextDescr.read() == 0 {
+    node.fence.fetchAdd(1);
+    if node.next == nil {
       // Fast path: Next task attempting to become the combiner will easily
       // have no problems.
-      if combinerList.compareExchangeStrong(descr, 0) {
-        // TODO: Cleanup
-        nodeGDT.unregister(descr);
+      if combinerList.compareExchange(node, nil) {
         return;
       }
 
       // At this point, someone has already set themselves as the tail (but has not
       // yet appended themselves) so we must wait until they finish.
-      var next : uint;
+      var next : FCHGlobalNode;
       while true {
-        next = node.nextDescr.read();
+        node.fence.fetchAdd(1);
+        next = node.next;
 
         // They've finished... Set them as combiner...
-        if next != 0 {
-          nodeGDT.read(next).isCombiner.write(true);
-          // TODO: Cleanup
-          nodeGDT.unregister(descr);
+        if next != nil {
+          next.isCombiner.write(true);
           return;
         }
         chpl_task_yield();
       }
     }
-    nodeGDT.read(node.nextDescr.read()).isCombiner.write(true);
-    nodeGDT.unregister(descr);
+    node.next.isCombiner.write(true);
   }
 
 
   proc synchronize(request : FCHFunctor(data.type)) {
-    var counter = 0;
     var nextNode = new FCHLocalNode(data.type);
     nextNode.wait.write(true);
     nextNode.completed = false;
@@ -135,15 +128,16 @@ class FCHLock {
       return;
     }
 
-    while !combinerStatus.testAndSet() do chpl_task_yield();
+    /*var ourNode = waitForCombiner();*/
 
     // If we are not marked as complete, we *are* the combiner thread
     var tmpNode = currNode;
     var tmpNodeNext : FCHLocalNode(data.type);
-    const maxRequests = here.maxTaskPar * numLocales;
+    const maxServed = here.maxTaskPar;
+    var served = 0;
 
-    while (tmpNode.next != nil && counter < maxRequests) {
-      counter = counter + 1;
+    while (tmpNode.next != nil && served < maxServed) {
+      served = served + 1;
       // Note: Ensures that we do not touch the current node after it is freed
       // by the owning thread...
       tmpNodeNext = tmpNode.next;
@@ -159,7 +153,7 @@ class FCHLock {
       tmpNode = tmpNodeNext;
     }
 
-    combinerStatus.write(false);
+    /*giveUpCombiner(ourNode);*/
 
     // At this point, it means one thing: Either we are on the dummy node, on which
     // case nothing happens, or we exceeded the number of requests we can do at once,
@@ -178,6 +172,7 @@ class FCHLock {
 }
 
 proc main() {
+  var nElems = 1000000;
 
   class MultiplyFunctor : FCHFunctor {
     var mult = 2;
@@ -198,11 +193,14 @@ proc main() {
   var lock = new FCHLock(data=1);
   timer.start();
   coforall loc in Locales {
+    var func = new MultiplyFunctor(int);
+
       on loc {
-        var func = new MultiplyFunctor(int);
-        forall i in 1 .. (GDT_NUM_ENTRIES / 2) {
+        var node = lock.waitForCombiner();
+        forall i in 1 .. nElems {
           lock.synchronize(func);
         }
+        lock.giveUpCombiner(node);
       }
   }
   lock.synchronize(new PrinterFunctor(int));
@@ -214,7 +212,7 @@ proc main() {
   var counter : atomic uint;
   counter.write(1);
   timer.start();
-  coforall loc in Locales do on loc do forall i in 1 .. (GDT_NUM_ENTRIES / 2) do {
+  coforall loc in Locales do on loc do forall i in 1 .. nElems do {
     while true {
       var count = counter.read();
       if counter.compareExchangeStrong(count, count * 2) then break;
@@ -230,7 +228,7 @@ proc main() {
   var counterLock$ : sync bool;
   var syncCounter = new syncCounterWrapper(x=1);
   timer.start();
-  coforall loc in Locales do on loc do forall i in 1 .. (GDT_NUM_ENTRIES / 2) do {
+  coforall loc in Locales do on loc do forall i in 1 .. nElems do {
     counterLock$ = true;
     syncCounter.x = syncCounter.x * 2;
     counterLock$;
