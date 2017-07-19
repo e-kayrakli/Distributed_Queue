@@ -24,7 +24,8 @@
 
   Open Question: Queue concatenation semantics...
 
-  <code>
+  .. code-block:: chapel
+
     // FIFO queue with capacity of one item...
     var q1 : Queue(int) = makeBoundedFIFO(1);
     // Adds the element '1' to the queue...
@@ -41,7 +42,7 @@
     // Can also be: + reduce (q1 + 1 + (2,3,4,5))
     // But the above requires memory management of the temporary queue created midway.
     var result = + reduce q2;
-  </code>
+
 */
 class Queue {
   /*
@@ -56,8 +57,7 @@ class Queue {
     :returns: If the enqueue is successful, and how many elements are added.
     :rtype: (bool, int)
   */
-  proc enqueue(elts : eltType ... ?nElts, transactional : bool = true) : (bool, int)
-  {halt();}
+  proc enqueue(elts : eltType ... ?nElts, transactional : bool = true) : (bool, int) {halt();}
 
   /*
     Adds all elements to the queue. Elements are added in the
@@ -66,8 +66,7 @@ class Queue {
     :returns: If the enqueue is successful, and how many elements are added.
     :rtype: (bool, int)
   */
-  proc enqueue(elts : [?n] eltType, transactional : bool = true) : (bool, int)
-  {halt();}
+  proc enqueue(elts : [?n] eltType, transactional : bool = true) : (bool, int) {halt();}
 
   /*
     Adds all elements to the queue. Elements are added in a more optimized way
@@ -102,9 +101,9 @@ class Queue {
     Remove at most `nElems` elements from the queue.
 
     :returns: If the queue is not empty and an array of items taken, if any.
-    :rtype: (bool, [] eltType)
+    :rtype: (bool, [?n] eltType)
   */
-  proc dequeue(nElems) : (int, [] eltType) {halt();}
+  proc dequeue(nElems) : (int, [?n] eltType) {halt();}
 
   /*
     Freezes the queue, making it immutable, if supported.
@@ -154,16 +153,7 @@ class QueueFactory {
   /*
     (WIP - In Planning)
 
-    Creates a bounded strict First-In-First-Out Queue. The queue utilizes a distributed
-    array and provides wait-free dequeue operations. The queue is dervied from the
-    'FFQ: A Fast Single-Producer/Multiple-Consumer Concurrent FIFO Queue' seen here:
-    http://se.inf.tu-dresden.de/pubs/papers/ffq2017.pdf
-
-    To allow safe concurrent enqueuers, an extension is required that combines the
-    high performance of the CC-Synch algorithm to create a derived variant of H-Synch
-    I call the 'FCHLock', or the 'Flat Combining Hierarichal Lock'. An extremely helpful
-    slide can be seen here:
-    https://opencourses.uoc.gr/courses/pluginfile.php/17173/mod_resource/content/0/HY586-Section3.pdf
+    Creates a distributed bounded strict First-In-First-Out Queue.
 
     :type eltType: Element type
 
@@ -172,8 +162,6 @@ class QueueFactory {
 
     :arg targetLocales: Locales to distribute across.
     :type targetLocales: [] locales
-
-    :rtype: DistributedBoundedFIFO(eltType)
   */
   proc makeDistributedBoundedFIFO(
     type eltType,
@@ -181,47 +169,64 @@ class QueueFactory {
     targetLocales : [] locale = Locales
   ) : Queue(eltType) {halt();}
 
-  // Local variant
+  /*
+    (WIP - In Planning)
+
+    Creates a local bounded strict First-In-First-Out Queue.
+
+    :type eltType: Element type
+
+    :arg maxElems: Maximum number of elements in the queue; halts if value is 0.
+    :type maxElems: uint
+  */
   proc makeBoundedFIFO(
     type eltType,
     maxElems : uint = 0
   ) : Queue(eltType) {halt();}
 
   /*
-    Creates an unbounded strict First-In-First-Out Queue. In this queue, each locale is
-    given their own queue, which uses a wait-free round robin algorithm to fairly
-    distribute computation, memory, and bandwidth and offers scalable performance.
-    The queue also allows the user to use their own custom backbone queues but defaults
-    to Michael Scott's two-locked synchronized queue, seen here:
-    https://www.research.ibm.com/people/m/michael/podc-1996.pdf
+    Creates a distributed unbounded strict First-In-First-Out Queue.
 
     :type eltType: Element type
 
     :arg targetLocales: Locales to distribute across.
     :type targetLocales: [] locales
-
-    :rtype: DistributedUnboundedFIFO(eltType)
   */
   proc makeDistributedUnboundedFIFO(
     type eltType,
     targetLocales : [] locale = Locales
   ) : Queue(eltType) {halt();}
 
-  // Local variant
+  /*
+    Creates a local unbounded strict First-In-First-Out Queue.
+
+    :type eltType: Element type
+  */
   proc makeUnboundedFIFO(
     type eltType
   ) : Queue(eltType) {halt();}
 
   /*
-    (WIP - Implementing)
+    Creates a distributed work stealing unbounded queue.
 
+    :type eltType: Element type
+
+    :arg targetLocales: Locales to distribute across.
+    :type targetLocales: [] locales
   */
   proc makeDistributedWorkQueue(
     type eltType,
     targetLocales : [] locale = Locales
   ) : Queue(eltType) {halt();}
 
-  // Local variant
+  /*
+    Creates a distributed work stealing unbounded queue.
+
+    :type eltType: Element type
+
+    :arg targetLocales: Locales to distribute across.
+    :type targetLocales: [] locales
+  */
   proc makeWorkQueue(
     type eltType
   ) : Queue(eltType) {halt();}
