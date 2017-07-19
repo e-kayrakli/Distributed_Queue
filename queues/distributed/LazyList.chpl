@@ -19,25 +19,45 @@ use Queue;
 class LazyListNode {
   type eltType;
   var elt : eltType;
+  var fence : atomic uint;
   var next : LazyListNode(elem.type);
 }
 
 class LazyList : Queue {
+  var nElems : atomic int;
   var head = LocalAtomicObject(LazyListNode(eltType));
   var tail = LocalAtomicObject(LazyListNode(eltType));
 
   proc enqueue(elt : eltType) {
     var node = new LazyListNode(eltType, elt);
+
+    while true {
+      if nElems.fetchAdd(1) >= 0 then break;
+    }
+
     var prev = tail.exchange(node);
     if prev == nil {
       head.write(node);
     } else {
-      prev.next.write(node);
+      prev.next = node;
+      prev.fence.fetchAdd(1);
     }
   }
 
 
   proc dequeue() : (bool, eltType) {
-      halt("Requires a Flat Combination Strategy...");
+    if nElem.fetchSub(1) <= 0 {
+      return (false, _defaultOf(eltType));
+    }
+
+    // Bottleneck...
+    while true {
+      var h = head.read();
+      if h == nil {
+        chpl_task_yield();
+        continue;
+      }
+      head.compareExchangeStrong(h, h.next);
+    }
   }
 }
