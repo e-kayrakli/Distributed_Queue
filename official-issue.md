@@ -66,4 +66,6 @@ kind of operation? What say you?
 var queue : Queue(int) = makeBoundedFIFO(int, 100);
 queue = (1,2,3,4,5);
 for i in 6 .. 100 do queue += i;
+// Interesting application: Queue literals... defaults to fixed-sized bounded queue
+var queueLiteral : Queue(int) = (1,2,3,4,5);
 ```

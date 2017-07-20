@@ -32,7 +32,7 @@ class Queue {
     See the first :proc:`enqueue` for more details.
 
     :returns: If the enqueue is successful, and how many elements are added.
-    :rtype: (bool, int)
+    :rtype: :type:`(bool, int)`
   */
   proc enqueue(elts : [?n] eltType) : (bool, int) {halt();}
 
@@ -42,9 +42,9 @@ class Queue {
     See the first :proc:`enqueue` for more details.
 
     :returns: If the enqueue is successful, and how many elements are added.
-    :rtype: (bool, int)
+    :rtype: :type:`(bool, int)`
   */
-  proc enqueue(queue : Queue(eltType)) : bool {halt();}
+  proc enqueue(queue : Queue(eltType)) : (bool, int) {halt();}
 
   /*
     Adds all elements yielded by the `iterObj`. In the case where not all
@@ -53,15 +53,15 @@ class Queue {
     yielded. See the first :proc:`enqueue` for more details.
 
     :returns: If the enqueue is successful, and how many elements are added.
-    :rtype: (bool, int)
+    :rtype: :type:`(bool, int)`
   */
-  proc enqueue(iterObj) : bool {halt();}
+  proc enqueue(iterObj) : (bool, int) {halt();}
 
   /*
     Remove an element from thr queue.
 
     :returns: If the queue is not empty and the item taken if any.
-    :rtype: (bool, eltType)
+    :rtype: :type:`(bool, int)`
   */
   proc dequeue() : (bool, eltType) {halt();}
 
@@ -69,7 +69,7 @@ class Queue {
     Remove at most `nElems` elements from the queue.
 
     :returns: If the queue is not empty and an array of items taken, if any.
-    :rtype: (bool, [?n] eltType)
+    :rtype: :type:`(bool, [?n] eltType)`
   */
   proc dequeue(nElems) : (int, [?n] eltType) {halt();}
 
@@ -77,7 +77,7 @@ class Queue {
     Freezes the queue, making it immutable, if supported.
 
     :returns: If it is a supported operation.
-    :rtype: bool
+    :rtype: :type:`bool`
   */
   proc freeze() : bool {halt();}
 
@@ -85,42 +85,31 @@ class Queue {
     Unfreezes the queue, making it mutable, if supported.
 
     :returns: If it is a supported operation.
-    :rtype: bool
+    :rtype: :type:`bool`
   */
   proc unfreeze() : bool {halt();}
 
   /*
-    Alias for enqueue.
+    Determines if the queue is frozen (immutable).
+
+    :returns: If queue is frozen
+    :rtype: :type:`bool`
   */
-  proc +=(elt : eltType ... ?nElts) : bool {halt();}
+  proc isFrozen() : bool {halt();}
 
   /*
-    Alias for enqueue.
-  */
-  proc +=(queue : Queue(eltType)) {halt();}
+    If the queue is frozen, iteration will iterate over all elements in the list
+    without consuming them. If the queue is unfrozen, then iteration will consume
+    all elements in the list equivalent to a highly optimized sequence of dequeues.
 
-  /*
-    Feedback needed...
-  */
-  proc +(elt : eltType ... ?nElts) {halt();}
-
-  /*
-    Feedback needed...
-  */
-  proc +(queue : Queue(eltType)) {halt();}
-
-  /*
-    Iterates over all elements in the queue. If the queue is frozen, then iteration
-    is read-only in that it will iterate over all elements without consuming them;
-    a normal iteration is equivalent to a more optimized sequence of dequeue operation.
+    :yields: Elements in the queue.
+    :ytype: :type:`eltType`
   */
   iter these() {halt();}
 }
 
 class QueueFactory {
   /*
-    (WIP - In Planning)
-
     Creates a distributed bounded strict First-In-First-Out Queue.
 
     :type eltType: Element type
@@ -129,7 +118,7 @@ class QueueFactory {
     :type maxElems: uint
 
     :arg targetLocales: Locales to distribute across.
-    :type targetLocales: [] locales
+    :type targetLocales: :type:`[] locales`
   */
   proc makeDistributedBoundedFIFO(
     type eltType,
@@ -138,14 +127,12 @@ class QueueFactory {
   ) : Queue(eltType) {halt();}
 
   /*
-    (WIP - In Planning)
-
     Creates a local bounded strict First-In-First-Out Queue.
 
     :type eltType: Element type
 
     :arg maxElems: Maximum number of elements in the queue; halts if value is 0.
-    :type maxElems: uint
+    :type maxElems: :type:`uint`
   */
   proc makeBoundedFIFO(
     type eltType,
@@ -158,7 +145,7 @@ class QueueFactory {
     :type eltType: Element type
 
     :arg targetLocales: Locales to distribute across.
-    :type targetLocales: [] locales
+    :type targetLocales: :type:`[] locales`
   */
   proc makeDistributedUnboundedFIFO(
     type eltType,
@@ -180,9 +167,9 @@ class QueueFactory {
     :type eltType: Element type
 
     :arg targetLocales: Locales to distribute across.
-    :type targetLocales: [] locales
+    :type targetLocales: :type:`[] locales`
   */
-  proc makeDistributedWorkQueue(
+  proc makeDistributedBalancedQueue(
     type eltType,
     targetLocales : [] locale = Locales
   ) : Queue(eltType) {halt();}
@@ -193,9 +180,9 @@ class QueueFactory {
     :type eltType: Element type
 
     :arg targetLocales: Locales to distribute across.
-    :type targetLocales: [] locales
+    :type targetLocales: :type:`[] locales`
   */
-  proc makeWorkQueue(
+  proc makeBalancedQueue(
     type eltType
   ) : Queue(eltType) {halt();}
 }
