@@ -10,31 +10,6 @@ Emulates [Go's 'make'](https://golang.org/pkg/builtin/#make).
 
 ## Proposed Additions
 
-### Iteration
-
-TODO: Iterating over elements in the queue
-
-### Open Question: Read-only iteration or 'draining' iteration?
-
-TODO: What would be default if both are added?
-
-Should iteration consume elements in the queue, or should it merely be 'read-only'?
-In the case of approving 'frozen' queue semantics, could we alternate between the two?
-In the case of disapproving 'frozen' queue semantics, would the potential loss in
-performance of acquiring locks be acceptable? If you're against both 'frozen' semantics
-and against potential performance loss, would you advocate for a more 'let-it-crash-and-burn'
-approach if the user attempts to concurrently use the queue during iteration? Furthermore,
-should we offer both types of iteration, and if so which should be the default?
-
-### Transactional Additions
-
-TODO: Enqueue adding in bulk 'all-or-nothing' transactional approach...
-
-#### Open Question: Dropped Objects
-
-TODO: When enqueue fails in transaction, but needs to 'rollback' the state of the
-iterator.
-
 ### 'Freezing' the Queue
 
 While parallel-safe data structures are desired, not all things can be done in a
@@ -54,6 +29,27 @@ TODO: Dual-Mode operation may be too confusing?
 
 TODO: What happens when an operation is ongoing when we attempt to freeze? Halt?
 Block? Impl.-Defined behavior?
+
+### Iteration
+
+### Open Question: Read-only iteration or 'draining' iteration?
+
+Should iteration consume elements in the queue, or should it merely be 'read-only'?
+In the case of approving 'frozen' queue semantics, could we alternate between the two?
+In the case of disapproving 'frozen' queue semantics, would the potential loss in
+performance of acquiring locks be acceptable? If you're against both 'frozen' semantics
+and against potential performance loss, would you advocate for a more 'let-it-crash-and-burn'
+approach if the user attempts to concurrently use the queue during iteration? Furthermore,
+should we offer both types of iteration, and if so which should be the default?
+
+### Transactional Additions
+
+TODO: Enqueue adding in bulk 'all-or-nothing' transactional approach...
+
+#### Open Question: Dropped Objects
+
+TODO: When enqueue fails in transaction, but needs to 'rollback' the state of the
+iterator.
 
 ### Operator Overloading
 
