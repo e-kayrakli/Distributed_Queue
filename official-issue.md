@@ -1,55 +1,53 @@
 # Chapel Queue API
 
-Chpldocs Link:
+Link to the chpldocs can be seen [here](https://louisjenkinscs.github.io/Distributed_Queue/modules/queues/Queue.html).
 
 ## The QueueFactory
 
-TODO: Describe rationale, such as being resistant to change.
-
 Emulates [Go's 'make'](https://golang.org/pkg/builtin/#make).
+
+### Open Questions
+
+* Should we maintain an interface at all?
+   * If not, then should we make each data structure a `record` instead?
+   * Resilience to Change vs Flexibility
 
 ## Proposed Additions
 
 ### 'Freezing' the Queue
 
 While parallel-safe data structures are desired, not all things can be done in a
-parallel manner. For these situations, I believe the queue should be armed with two
+parallel-safe manner. For these situations, I believe the queue should be armed with two
 states: Mutable (unfrozen) and Immutable (frozen). The benefit is two-fold, as it
 enables optimizations such as adopting a more optimistic manner of accessing data
 by not contesting for locks meaning more performance, and the user has the benefit
-of enforcing immutability across nodes. In my opinion, this is the only 'safe' way
-to allow things like reduction, zipper, and mapping iterations without modifying
-the queue while allowing a significant performance boost.
+of enforcing immutability across nodes without need for external synchronization. 
+I believe that this is the only 'safe' way to allow things like reduction, zipper, 
+and mapping iterations without modifying the queue while providing a significant performance boost.
 
-#### Open Question: Semantic Changes
+#### Open Questions
 
-TODO: Dual-Mode operation may be too confusing?
-
-#### Open Question: Concurrent Ongoing Operations
-
-TODO: What happens when an operation is ongoing when we attempt to freeze? Halt?
-Block? Impl.-Defined behavior?
+* Are the semantic changes of having dual-mode operations too confusing?
+* What happens to concurrent ongoing operations while freezing/unfreezing the queue?
+   * Should we halt? Block until unfrozen? Make it 'implementation-defined' behavior?
 
 ### Iteration
 
-### Open Question: Read-only iteration or 'draining' iteration?
+Iteration allows for the queue to become more than just a simple container, making things
+such as reductions, zipper-iterables, and mappings possible.
 
-Should iteration consume elements in the queue, or should it merely be 'read-only'?
-In the case of approving 'frozen' queue semantics, could we alternate between the two?
-In the case of disapproving 'frozen' queue semantics, would the potential loss in
-performance of acquiring locks be acceptable? If you're against both 'frozen' semantics
-and against potential performance loss, would you advocate for a more 'let-it-crash-and-burn'
-approach if the user attempts to concurrently use the queue during iteration? Furthermore,
-should we offer both types of iteration, and if so which should be the default?
+### Open Questions
+
+* Should we allow read-only iteration or 'draining' iteration, perhaps both?
+   * Proposal: Based on if the queue is 'frozen' or 'unfrozen'.
 
 ### Transactional Additions
 
-TODO: Enqueue adding in bulk 'all-or-nothing' transactional approach...
+Enqueue adding in bulk 'all-or-nothing' transactional approach.
 
-#### Open Question: Dropped Objects
+#### Open Questions
 
-TODO: When enqueue fails in transaction, but needs to 'rollback' the state of the
-iterator.
+* Should we allow adding non-scalar types? From other queues
 
 ### Operator Overloading
 
@@ -62,6 +60,8 @@ kind of operation? What say you?
 var queue : Queue(int) = makeBoundedFIFO(int, 100);
 queue = (1,2,3,4,5);
 for i in 6 .. 100 do queue += i;
-// Interesting application: Queue literals... defaults to fixed-sized bounded queue
+// Would it be possible to create 'Queue literals' this way... 
+// It would default to a fixed-sized bounded queue with the items given to it
+// if the left hand side is nil? Furthermore, would it be useful?
 var queueLiteral : Queue(int) = (1,2,3,4,5);
 ```
