@@ -82,6 +82,16 @@ class Queue {
   proc freeze() : bool {halt();}
 
   /*
+    Clears the queue of all elements in a best-effort approach. Elements added
+    concurrently, or elements moved around via means of work stealing may be
+    missed.
+
+    :returns: If the queue is unfrozen.
+    :rtype: :type:`bool`
+  */
+  proc clear() : bool {halt();}
+
+  /*
     Unfreezes the queue, making it mutable, if supported.
 
     :returns: If it is a supported operation.
@@ -106,6 +116,42 @@ class Queue {
     :ytype: :type:`eltType`
   */
   iter these() {halt();}
+
+  /*
+    If the queue is frozen, then it returns a deterministic # of items in the queue.
+    If the queue is unfrozen, then it makes an implementation-dependent best-effort.
+
+    :returns: Number of elements in the queue.
+    :rtype: :type:`uint`
+  */
+  proc length : uint {halt();}
+
+  /*
+    If the queue is frozen, then it returns a deterministic yes/no if the queue is empty.
+    If the queue is unfrozen, then it makes an implementation-dependent best-effort.
+
+    :returns: If the queue is empty.
+    :rtype: :type:`bool`
+  */
+  proc isEmpty() : bool {halt();}
+
+  /*
+    If the queue is frozen, then it returns a deterministic yes/no if the queue is full.
+    If the queue is unfrozen, then it makes an implementation-dependent best-effort.
+
+    :returns: If the queue is full.
+    :rtype: :type:`bool`
+  */
+  proc isFull() : bool {halt();}
+
+  /*
+    If the queue is unbounded, then this will return 0. If the queue is bounded,
+    then it will return the upper bounds of number of elements it may hold.
+
+    :returns: Capacity of the queue; if the queue is unbounded, always 0.
+    :rtype: :type:`uint`
+  */
+  proc capacity : uint {halt();}
 }
 
 class QueueFactory {
