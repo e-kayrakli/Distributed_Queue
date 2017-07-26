@@ -1,63 +1,150 @@
-proc +=(c : Collection(?eltTyp), e : eltType) : bool {
-  return c.add(e);
+/*
+  Syntactic sugar for 'add'.
+*/
+proc +=(c : Collection(?eltTyp), other) : bool {
+  return c.add(other);
 }
 
 /*
-  A data structure.
+  Base class for data structures.
 */
 class Collection {
   type eltType;
-  proc add(elt : eltType) : bool {halt();}
-  proc remove(elt : eltType) : bool {halt();}
-  proc contains(elt : eltType) : bool {halt();}
-  proc clear() {halt();}
-  proc isEmpty : bool {halt();}
-  proc size : int {halt();}
-  iter these() : eltType {halt();}
 
-  // TODO: Should this be in a separate interface?
-  proc canFreeze() : bool {halt();}
-  proc freeze() : bool {halt();}
-  proc isFrozen() : bool {halt();}
-  proc unfreeze() : bool {halt();}
+  /*
+    Adds an element to this data structure.
+  */
+  proc add(elt : eltType ... ?nElts) : bool {halt();}
+  /*
+    Add all elements from another collection to this.
+  */
+  proc add(otherCollection : Collection(eltType)) : bool {halt();}
+  /*
+    Add all elements in the array.
+  */
+  proc add(elts : [?nElts] eltType) : bool {halt();}
+  /*
+    Removes an arbitrary element from this data structure.
+  */
+  proc remove() : (bool, eltType) {halt();}
+  /*
+    Removes up to `nElems` elements into a separate collection.
+  */
+  proc remove(nElems : int) : Collection(eltType) {halt();}
+  /*
+    Removes an item from the data structure (if it exists).
+  */
+  proc removeItem(elt : eltType) : bool {halt();}
+  /*
+    Check if the element exists in this data structure.
+  */
+  proc contains(elt : eltType) : bool {halt();}
+  /*
+    Clears all elements from this data structure.
+  */
+  proc clear() {halt();}
+  /*
+    Check if this data structure is empty.
+  */
+  proc isEmpty : bool {halt();}
+  /*
+    Obtain the number of elements contained in this data structure.
+  */
+  proc size : int {halt();}
+  /*
+    Iterate over all elements in the data structure.
+  */
+  iter these() : eltType {halt();}
+}
+
+module Stack {
+  /*
+    A Last-In-First-Out data structure. Classes inheriting from this class must
+    override the `add` to push elements in Last-In-First-Out order, and `remove`
+    to pop elements in Last-In-First-Out order.
+  */
+  class Stack : Collection {}
+
+  /*
+    A stack with a static capacity.
+  */
+  class BoundedStack : Stack {
+    proc capacity : int {halt();}
+  }
+
+  /*
+    A stack with a dynamic capacity.
+  */
+  class DynamicBoundedStack : BoundedStack {
+    proc resize(newSize : int) : bool {halt();}
+  }
 }
 
 module Queue {
   /*
-    A First-In-First-Out data structure.
+    A First-In-First-Out data structure. Classes inheriting from this class must
+    override the `add` to enqueue elements in First-In-First-Out order, and `remove`
+    to dequeue elements in First-In-First-Out order.
   */
-  class Queue : Collection {
-    proc enqueue(elt : eltType) : bool {halt();}
-    proc dequeue(elt : eltType) : (bool, eltType) {halt();}
+  class Queue : Collection {}
+
+  /*
+    A queue with a static capacity.
+  */
+  class BoundedQueue : Queue {
+    proc capacity : int {halt();}
   }
 
   /*
-    A queue that is bounded; may or may not support resizing.
+    A queue with a dynamic capacity.
   */
-  class BoundedQueue : Queue {
-    proc cap : int {halt();}
+  class DynamicBoundedQueue : BoundedQueue {
     proc resize(newSize : int) : bool {halt();}
   }
 }
 
 module List {
   /*
-    A list that supports some ordering that allows it to be indexed, such as the
-    order in which elements are inserted. Note that this does not mean it is a
-    sorted list.
+    A data structure without any particular ordering.
   */
-  class OrderedList : Collection {
-    proc get(idx : int) : (bool, eltType) {halt();}
-    proc indexOf(elt : eltType) : int {halt();}
-    proc add(idx : int, elt : eltType) : bool {halt();}
-    proc split(start : int, end : int = -1) : List(eltType) {halt();}
+  class List : Collection {}
+
+  /*
+    A data structure with a static capacity.
+  */
+  class BoundedList : List {
+    proc capacity : int {halt();}
   }
 
   /*
-    A list that does not allow proper indexing, but does allow removal of arbitary
-    elements therein.
+    A data structure with a dynamic capacity.
   */
-  class UnorderedList : Collection {
-    proc remove() : (bool, eltType) {halt();}
+  class DynamicBoundedList : BoundedList {
+    proc resize(newSize : int) : bool {halt();}
+  }
+
+  /*
+    A list that can be indexed into.
+  */
+  class IndexableList : Collection {
+    /*
+      Obtain the element at the requested index.
+    */
+    proc get(idx : int) : (bool, eltType) {halt();}
+    /*
+      Obtains the index of the requested element, if present in the list.
+    */
+    proc indexOf(elt : eltType) : int {halt();}
+    /*
+      Add an element at a specific index in the list.
+    */
+    proc add(idx : int, elt : eltType) : bool {halt();}
+    /*
+      Creates a new list containing the items at the specified indexes. If `end`
+      is less than `start`, then the end indice is set to the end of the list.
+      If the `end` is greater than the size of the list, it will also be set
+      to the end of the list.
+    */
+    proc subList(start : int, end : int = -1) : IndexableList(eltType) {halt();}
   }
 }
